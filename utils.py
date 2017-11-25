@@ -41,6 +41,7 @@ def generate_dataset_from_video(video_path):
     return train_data, train_target, test_data, test_target, mean_img
 
 
+# TODO: Understand this
 def tf_ms_ssim(img1, img2, mean_metric=True, level=5):
     with tf.variable_scope("ms_ssim_loss"):
         img1 = tf.image.rgb_to_grayscale(img1)
