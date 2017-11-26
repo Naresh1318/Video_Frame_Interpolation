@@ -28,7 +28,7 @@ def generate_dataset_from_video(video_path):
         else:
             try:
                 train_data.append(np.append(frames[frame_index], frames[frame_index + 4], axis=2))
-                train_target.append(frames[frame_index + 4])
+                train_target.append(frames[frame_index + 2])
                 test_data.append(np.append(frames[frame_index], frames[frame_index + 2], axis=2))
             except IndexError:
                 print("Dataset generation done!")

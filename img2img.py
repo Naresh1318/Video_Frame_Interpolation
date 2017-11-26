@@ -3,12 +3,15 @@ import tensorflow as tf
 import mission_control as mc
 import ops
 import utils
+import sys
 
 
 # Placeholders
 input_image = tf.placeholder(dtype=tf.float32, shape=[None, 288, 352, 3], name='Input_image')
 target_image = tf.placeholder(dtype=tf.float32, shape=[None, 288, 352, 3], name='Target_image')
 global_step = tf.placeholder(dtype=tf.int64, shape=[], name="Global_Step")
+
+train_data, train_target, test_data, test_target, mean_img = utils.generate_dataset_from_video(mc.video_path)
 
 
 def generator(x, reuse=False):
@@ -40,11 +43,11 @@ def generator(x, reuse=False):
                                       center=True, scale=True, is_training=True, scope='g_e_batch_Norm_8'))
 
     # Decoder
-    dconv_1 = ops.lrelu(tf.nn.dropout(ops.batch_norm(ops.cnn_2d_trans(conv_8, weight_shape=[4, 4, 512, 512], strides=[1, 2, 2, 1], output_shape=[mc.batch_size, conv_8.get_shape()[1].value*2, conv_8.get_shape()[2].value*2, 512], name='g_d_dconv_1'), center=True, scale=True, is_training=True, scope='g_d_batch_Norm_1'), keep_prob=0.5))
+    dconv_1 = ops.lrelu(tf.nn.dropout(ops.batch_norm(ops.cnn_2d_trans(conv_8, weight_shape=[2, 2, 512, 512], strides=[1, 2, 2, 1], output_shape=[mc.batch_size, conv_8.get_shape()[1].value+1, conv_8.get_shape()[2].value+1, 512], name='g_d_dconv_1'), center=True, scale=True, is_training=True, scope='g_d_batch_Norm_1'), keep_prob=0.5))
     dconv_1 = tf.concat([dconv_1, conv_7], axis=3)
-    dconv_2 = ops.lrelu(tf.nn.dropout(ops.batch_norm(ops.cnn_2d_trans(dconv_1, weight_shape=[4, 4, 512, 1024], strides=[1, 2, 2, 1], output_shape=[mc.batch_size, dconv_1.get_shape()[1].value*2, (dconv_1.get_shape()[2].value+1)*2, 512], name='g_d_dconv_2'), center=True, scale=True, is_training=True, scope='g_d_batch_Norm_2'), keep_prob=0.5))
+    dconv_2 = ops.lrelu(tf.nn.dropout(ops.batch_norm(ops.cnn_2d_trans(dconv_1, weight_shape=[4, 4, 512, 1024], strides=[1, 2, 2, 1], output_shape=[mc.batch_size, dconv_1.get_shape()[1].value*2-1, dconv_1.get_shape()[2].value*2, 512], name='g_d_dconv_2'), center=True, scale=True, is_training=True, scope='g_d_batch_Norm_2'), keep_prob=0.5))
     dconv_2 = tf.concat([dconv_2, conv_6], axis=3)
-    dconv_3 = ops.lrelu(tf.nn.dropout(ops.batch_norm(ops.cnn_2d_trans(dconv_2, weight_shape=[4, 4, 512, 1024], strides=[1, 2, 2, 1], output_shape=[mc.batch_size, (dconv_2.get_shape()[1].value+1)*2, (dconv_2.get_shape()[2].value+1)*2, 512], name='g_d_dconv_3'), center=True, scale=True, is_training=True, scope='g_d_batch_Norm_3'), keep_prob=0.5))
+    dconv_3 = ops.lrelu(tf.nn.dropout(ops.batch_norm(ops.cnn_2d_trans(dconv_2, weight_shape=[4, 4, 512, 1024], strides=[1, 2, 2, 1], output_shape=[mc.batch_size, dconv_2.get_shape()[1].value*2-1, dconv_2.get_shape()[2].value*2-1, 512], name='g_d_dconv_3'), center=True, scale=True, is_training=True, scope='g_d_batch_Norm_3'), keep_prob=0.5))
     dconv_3 = tf.concat([dconv_3, conv_5], axis=3)
     dconv_4 = ops.lrelu(ops.batch_norm(ops.cnn_2d_trans(dconv_3, weight_shape=[4, 4, 512, 1024], strides=[1, 2, 2, 1], output_shape=[mc.batch_size, dconv_3.get_shape()[1].value*2, dconv_3.get_shape()[2].value*2, 512], name='g_d_dconv_4'), center=True, scale=True, is_training=True, scope='g_d_batch_Norm_4'))
     dconv_4 = tf.concat([dconv_4, conv_4], axis=3)
@@ -68,7 +71,7 @@ def discriminator(x, reuse=False):
     conv_2 = ops.lrelu(ops.batch_norm(ops.cnn_2d(conv_1, weight_shape=[4, 4, 64, 128],
                                                  strides=[1, 2, 2, 1], name='dis_conv_2'),
                                       center=True, scale=True, is_training=True, scope='dis_batch_Norm_2'))
-    conv_3 = ops.lrelu(ops.batch_norm(ops.cnn_2d(conv_2, weight_shape=[4, 4, 64, 256],
+    conv_3 = ops.lrelu(ops.batch_norm(ops.cnn_2d(conv_2, weight_shape=[4, 4, 128, 256],
                                                  strides=[1, 2, 2, 1], name='dis_conv_3'),
                                       center=True, scale=True, is_training=True, scope='dis_batch_Norm_3'))
     conv_4 = ops.lrelu(ops.batch_norm(ops.cnn_2d(conv_3, weight_shape=[4, 4, 256, 512],
@@ -80,7 +83,7 @@ def discriminator(x, reuse=False):
     conv_6 = ops.lrelu(ops.batch_norm(ops.cnn_2d(conv_5, weight_shape=[4, 4, 512, 512],
                                                  strides=[1, 2, 2, 1], name='dis_conv_6'),
                                       center=True, scale=True, is_training=True, scope='dis_batch_Norm_6'))
-    output = ops.dense(conv_6, 4 * 5, 1, name='dis_output')
+    output = ops.dense(conv_6, 5 * 6, 1, name='dis_output')
     return output
 
 
@@ -126,7 +129,56 @@ def train():
     discriminator_optimizer = tf.train.AdamOptimizer(d_learning_rate, beta1=mc.beta1).minimize(discriminator_loss,
                                                                                                var_list=d_vars)
 
+    # Summaries
+    tf.summary.scalar('l1_loss', l1_loss)
+    tf.summary.scalar('discriminator_loss', discriminator_loss)
+    tf.summary.scalar('generator_fake_loss', generator_fake_loss)
+    tf.summary.scalar('generator_loss', generator_loss)
+    tf.summary.scalar('generator_lr', g_learning_rate)
+    tf.summary.scalar('discriminator_lr', d_learning_rate)
+    tf.summary.image('generated_image', generated_image)
+    tf.summary.image('input_image', input_image)
+    tf.summary.image('target_image', target_image)
 
+    summary_op = tf.summary.merge_all()
+
+    init_op = tf.global_variables_initializer()
+
+    with tf.Session() as sess:
+        sess.run(init_op)
+        file_writer = tf.summary.FileWriter(logdir='./Tensorboard', graph=sess.graph)
+        step = 1
+        for e in range(mc.n_epochs):
+            n_batches = int(len(train_data) / mc.batch_size)
+            for b in range(n_batches):
+                batch_indx = np.random.permutation(len(train_data))[:mc.batch_size]
+                train_data_batch = [train_data[t] for t in batch_indx]
+                train_target_batch = [train_target[t] for t in batch_indx]
+
+                for i in range(1):
+                    sess.run(discriminator_optimizer,
+                             feed_dict={input_image: train_data_batch, target_image: train_target_batch,
+                                        global_step: step})
+
+                for i in range(1):
+                    sess.run(generator_optimizer,
+                             feed_dict={input_image: train_data_batch, target_image: train_target_batch,
+                                        global_step: step})
+
+                s, l, dl, gl = sess.run([summary_op, l1_loss, discriminator_loss, generator_fake_loss],
+                                        feed_dict={input_image: train_data_batch, target_image: train_target_batch,
+                                                   global_step: step})
+
+                print("\rEpoch: {}/{} \t Batch: {}/{}  l1_loss: {} disc_loss: {} gen_loss: {}".format(e, mc.n_epochs, b,
+                                                                                                      n_batches, l, dl,
+                                                                                                      gl))
+                sys.stdout.flush()
+                file_writer.add_summary(s)
+                step += 1
+
+
+if __name__ == '__main__':
+    train()
 
 
 

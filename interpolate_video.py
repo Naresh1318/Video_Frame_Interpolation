@@ -98,9 +98,9 @@ def train():
     g_vars = [var for var in t_vars if 'g_' in var.name]
 
     g_learning_rate = tf.train.exponential_decay(mc.generator_lr, global_step,
-                                                 1, 0.96, staircase=True)
+                                                 1, 0.999, staircase=True)
     d_learning_rate = tf.train.exponential_decay(mc.discriminator_lr, global_step,
-                                                 1, 0.96, staircase=True)
+                                                 1, 0.999, staircase=True)
 
     generator_optimizer = tf.train.AdamOptimizer(g_learning_rate, beta1=mc.beta1).minimize(generator_loss,
                                                                                            var_list=g_vars)
@@ -145,15 +145,16 @@ def train():
                              feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
                                         global_step: step})
 
-                s, l, dl, gl = sess.run([summary_op, l1_loss, discriminator_loss, generator_fake_loss],
-                                        feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
-                                                   global_step: step})
+                s, l, dl, gl, gs = sess.run([summary_op, l1_loss, discriminator_loss, generator_fake_loss, global_step],
+                                            feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
+                                                       global_step: step})
 
                 print("\rEpoch: {}/{} \t Batch: {}/{}  l1_loss: {} disc_loss: {} gen_loss: {}".format(e, mc.n_epochs, b,
                                                                                                       n_batches, l, dl,
                                                                                                       gl))
                 sys.stdout.flush()
-                file_writer.add_summary(s)
+                file_writer.add_summary(s, step)
+                step += 1
 
 
 if __name__ == '__main__':
