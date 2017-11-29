@@ -41,6 +41,25 @@ def generate_dataset_from_video(video_path):
     return train_data, train_target, test_data, test_target, mean_img
 
 
+def split_video_frames(video_path):
+    video_frames = []
+
+    frames = skvideo.io.vread(video_path)
+    frames = np.array(frames / 255, dtype=np.float32)
+    mean_img = np.mean(frames[::2], 0)
+    frames = frames - mean_img
+
+    for frame_index in range(len(frames)):
+        try:
+            video_frames.append(np.append(frames[frame_index], frames[frame_index + 1], axis=2))
+        except IndexError:
+            print("Dataset prepared!")
+            break
+
+    video_frames = np.array(video_frames).reshape([-1, 288, 352, 6])
+    return video_frames
+
+
 # TODO: Understand this
 def tf_ms_ssim(img1, img2, mean_metric=True, level=5):
     with tf.variable_scope("ms_ssim_loss"):

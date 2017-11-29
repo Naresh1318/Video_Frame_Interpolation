@@ -144,6 +144,8 @@ def train():
 
     init_op = tf.global_variables_initializer()
 
+    saver = tf.train.Saver()
+
     with tf.Session() as sess:
         sess.run(init_op)
         file_writer = tf.summary.FileWriter(logdir='./Tensorboard', graph=sess.graph)

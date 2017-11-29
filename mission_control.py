@@ -10,7 +10,11 @@ generator_lr = 0.005
 discriminator_lr = 0.00005
 beta1 = 0.5
 
+# Control
+train_model = False
+
 # Paths
-video_path = './Dataset/videos/bus_cif.y4m'
+video_path = "./Dataset/videos/bus_cif.y4m"
+results_path = "./Results"
 
 

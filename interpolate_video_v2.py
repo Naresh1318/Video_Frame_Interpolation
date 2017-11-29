@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import mission_control as mc
+import matplotlib.pyplot as plt
 import ops
 import utils
 import sys
@@ -240,49 +241,84 @@ def train():
 
     init_op = tf.global_variables_initializer()
 
+    saver = tf.train.Saver()
+
     with tf.Session() as sess:
         sess.run(init_op)
-        file_writer = tf.summary.FileWriter(logdir='./Tensorboard_v2', graph=sess.graph)
-        step = 1
-        for e in range(mc.n_epochs):
-            n_batches = int(len(train_data) / mc.batch_size)
-            for b in range(n_batches):
-                batch_indx = np.random.permutation(len(train_data))[:mc.batch_size]
-                train_data_batch = [train_data[t] for t in batch_indx]
-                train_target_batch = [train_target[t] for t in batch_indx]
+        file_writer = tf.summary.FileWriter(logdir=mc.results_path + '/Tensorboard', graph=sess.graph)
 
-                for i in range(1):
-                    sess.run(sin_discriminator_optimizer,
-                             feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
-                                        global_step: step})
+        if mc.train_model:
+            step = 1
+            for e in range(mc.n_epochs):
+                n_batches = int(len(train_data) / mc.batch_size)
+                for b in range(n_batches):
+                    batch_indx = np.random.permutation(len(train_data))[:mc.batch_size]
+                    train_data_batch = [train_data[t] for t in batch_indx]
+                    train_target_batch = [train_target[t] for t in batch_indx]
 
-                for i in range(1):
-                    sess.run(sin_generator_optimizer,
-                             feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
-                                        global_step: step})
+                    for i in range(1):
+                        sess.run(sin_discriminator_optimizer,
+                                 feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
+                                            global_step: step})
 
-                for i in range(1):
-                    sess.run(rn_discriminator_optimizer,
-                             feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
-                                        global_step: step})
+                    for i in range(1):
+                        sess.run(sin_generator_optimizer,
+                                 feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
+                                            global_step: step})
 
-                for i in range(1):
-                    sess.run(rn_generator_optimizer,
-                             feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
-                                        global_step: step})
+                    for i in range(1):
+                        sess.run(rn_discriminator_optimizer,
+                                 feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
+                                            global_step: step})
 
-                s, sin_l, sin_dl, sin_gl, rn_l, rn_dl, rn_gl, gs = \
-                    sess.run([summary_op, sin_l1_loss, sin_discriminator_loss, sin_generator_fake_loss, rn_l1_loss,
-                              rn_discriminator_loss, rn_generator_fake_loss, global_step],
-                             feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
-                                        global_step: step})
+                    for i in range(1):
+                        sess.run(rn_generator_optimizer,
+                                 feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
+                                            global_step: step})
 
-                print("\rEpoch: {}/{} \t Batch: {}/{}  sin_l1_loss: {} sin_disc_loss: {} sin_gen_loss: {} \t "
-                      "rn_l1_loss: {} rn_disc_loss: {} rn_gen_loss: {}".format(e, mc.n_epochs, b, n_batches, sin_l,
-                                                                               sin_dl, sin_gl, rn_l, rn_dl, rn_gl))
-                sys.stdout.flush()
-                file_writer.add_summary(s, step)
-                step += 1
+                    s, sin_l, sin_dl, sin_gl, rn_l, rn_dl, rn_gl, gs = \
+                        sess.run([summary_op, sin_l1_loss, sin_discriminator_loss, sin_generator_fake_loss, rn_l1_loss,
+                                  rn_discriminator_loss, rn_generator_fake_loss, global_step],
+                                 feed_dict={input_frames: train_data_batch, target_frame: train_target_batch,
+                                            global_step: step})
+
+                    print("\rEpoch: {}/{} \t Batch: {}/{}  sin_l1_loss: {} sin_disc_loss: {} sin_gen_loss: {} \t "
+                          "rn_l1_loss: {} rn_disc_loss: {} rn_gen_loss: {}".format(e, mc.n_epochs, b, n_batches, sin_l,
+                                                                                   sin_dl, sin_gl, rn_l, rn_dl, rn_gl))
+                    sys.stdout.flush()
+                    file_writer.add_summary(s, step)
+                    step += 1
+
+                # TODO: Testing part not done yet
+
+            # Save the trained model
+            saver.save(sess, save_path=mc.results_path + "/Saved_models")
+        else:
+            saver.restore(sess, save_path=tf.train.latest_checkpoint(mc.results_path + "/Saved_models"))
+
+            # TODO: Up-sample the entire video and produce a gif or a new video
+            video_frames = utils.split_video_frames(mc.video_path)
+
+            intermediate_frames = []
+
+            for i, frames in enumerate(video_frames):
+                frames = frames.reshape(1, 288, 352, 6)
+                inter_frame = sess.run(rn_output_frame, feed_dict={input_frames: frames})
+                intermediate_frames.append(inter_frame)
+                print("Generating frame: {}/{}".format(i, len(video_frames)))
+
+            # Combine the input and the generated frames
+            all_frames = []
+            for i, frame in enumerate(intermediate_frames):
+                all_frames.append(np.clip(video_frames[i][:, :, :3] + mean_img, 0, 1))
+                frame = np.clip(frame + mean_img, 0, 1)
+                all_frames.append(frame[0])
+                # all_frames.append(np.clip(video_frames[i][:, :, 3:] + mean_img, 0, 1))
+                print("Upsampling frame: {}/{}".format(i, len(intermediate_frames)))
+
+            # Save all the generated images
+            for i, f in enumerate(all_frames):
+                plt.imsave("./Results/Output_frames/{:05d}.png".format(i), arr=f)
 
 
 if __name__ == '__main__':
