@@ -10,7 +10,7 @@ input_frames = tf.placeholder(dtype=tf.float32, shape=[None, 288, 352, 6], name=
 target_frame = tf.placeholder(dtype=tf.float32, shape=[None, 288, 352, 3], name="Target_Frame")
 global_step = tf.placeholder(dtype=tf.int64, shape=[], name="Global_Step")
 
-train_data, train_target, test_data, test_target, mean_img = utils.generate_dataset_from_video(mc.video_path)
+train_data, train_target, test_data, test_target, mean_img = utils.split_video_frames_v2(mc.images_path)
 
 
 def rn_generator(x, reuse=False):
@@ -245,7 +245,7 @@ def train():
 
     with tf.Session() as sess:
         sess.run(init_op)
-        file_writer = tf.summary.FileWriter(logdir=mc.results_path + '/Tensorboard', graph=sess.graph)
+        file_writer = tf.summary.FileWriter(logdir=mc.results_path + '/Tensorboard_v3', graph=sess.graph)
 
         if mc.train_model:
             step = 1
@@ -292,12 +292,12 @@ def train():
                 # TODO: Testing part not done yet
 
             # Save the trained model
-            saver.save(sess, save_path=mc.results_path + "/Saved_models")
+            saver.save(sess, save_path=mc.results_path + "/Saved_models/earth")
         else:
-            saver.restore(sess, save_path=tf.train.latest_checkpoint(mc.results_path + "/Saved_models"))
+            saver.restore(sess, save_path=tf.train.latest_checkpoint(mc.results_path + "/Saved_models/"))
 
             # TODO: Up-sample the entire video and produce a gif or a new video
-            video_frames = utils.split_video_frames(mc.video_path)
+            video_frames = utils.split_video_frames_v3(mc.images_path)
 
             intermediate_frames = []
 

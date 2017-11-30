@@ -14,7 +14,8 @@ beta1 = 0.5
 train_model = False
 
 # Paths
-video_path = "./Dataset/videos/bus_cif.y4m"
+video_path = "./Dataset/videos/earth.mov"
 results_path = "./Results"
+images_path = "./Dataset/images"
 
 

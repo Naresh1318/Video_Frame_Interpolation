@@ -1,6 +1,9 @@
 import skvideo.io
 import numpy as np
 import tensorflow as tf
+from PIL import Image, ImageOps
+import matplotlib.pyplot as plt
+import os
 
 
 def generate_dataset_from_video(video_path):
@@ -45,7 +48,79 @@ def split_video_frames(video_path):
     video_frames = []
 
     frames = skvideo.io.vread(video_path)
-    frames = np.array(frames / 255, dtype=np.float32)
+    frames = np.array(frames / 255, dtype=np.float32).reshape([-1, 288, 352, 3])
+    mean_img = np.mean(frames[::2], 0)
+    frames = frames - mean_img
+
+    for frame_index in range(len(frames)):
+        try:
+            video_frames.append(np.append(frames[frame_index], frames[frame_index + 1], axis=2))
+        except IndexError:
+            print("Dataset prepared!")
+            break
+
+    video_frames = np.array(video_frames).reshape([-1, 288, 352, 6])
+    return video_frames
+
+
+# TODO: Remove this function later
+def split_video_frames_v2(images_path):
+
+    frames = []
+    train_data = []
+    train_target = []
+    test_data = []
+    test_target = []
+
+    img_paths = sorted(os.listdir(images_path))[1:]
+
+    for i, img_path in enumerate(img_paths):
+        img = Image.open(images_path + '/' + img_path)
+        img = ImageOps.crop(img, 130)
+        img = np.array(img.resize([352, 288]))[:, :, :3]
+        img = img/255
+        frames.append(img)
+    frames = np.array(frames).reshape([-1, 288, 352, 3])
+
+    mean_img = np.mean(frames[::2], 0)
+    frames = frames - mean_img
+    for frame_index in range(len(frames)):
+        if frame_index % 2 == 1:
+            test_target.append(frames[frame_index])
+        else:
+            try:
+                train_data.append(np.append(frames[frame_index], frames[frame_index + 4], axis=2))
+                train_target.append(frames[frame_index + 2])
+                test_data.append(np.append(frames[frame_index], frames[frame_index + 2], axis=2))
+            except IndexError:
+                print("Dataset generation done!")
+                break
+    train_data = np.array(train_data).reshape([-1, 288, 352, 6])
+    train_target = np.array(train_target).reshape([-1, 288, 352, 3])
+    test_data = np.array(test_data).reshape([-1, 288, 352, 6])
+    test_target = np.array(test_target).reshape([-1, 288, 352, 3])
+
+    return train_data, train_target, test_data, test_target, mean_img
+
+
+# TODO: Remove this later
+def split_video_frames_v3(images_path):
+    video_frames = []
+    frames = []
+
+    img_paths = sorted(os.listdir(images_path))[1:]
+
+    for i, img_path in enumerate(img_paths):
+        img = Image.open(images_path + '/' + img_path)
+        img = ImageOps.crop(img, 130)
+        img = np.array(img.resize([352, 288]))[:, :, :3]
+        img = img/255
+        frames.append(img)
+    frames = np.array(frames).reshape([-1, 288, 352, 3])
+
+    for i, frame in enumerate(frames):
+        plt.imsave('./Dataset/i_{:05d}.png'.format(i), frame)
+
     mean_img = np.mean(frames[::2], 0)
     frames = frames - mean_img
 
